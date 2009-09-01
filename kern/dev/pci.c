@@ -28,6 +28,7 @@ struct pci_driver pci_attach_class[] = {
 };
 
 struct pci_driver pci_attach_vendor[] = {
+    { VENDOR_ID_82559, DEVICE_ID_82559ER, &e100_attach },
     { 0, 0, 0 },
 };
 
