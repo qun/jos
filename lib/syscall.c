@@ -123,3 +123,8 @@ sys_time_msec()
 	return (unsigned) syscall(SYS_time_msec, 0, 0, 0, 0, 0, 0);
 }
 
+int
+sys_phy_page(envid_t envid, void *va)
+{
+	return syscall(SYS_phy_page, 0, (uint32_t)envid, (uint32_t)va, 0, 0, 0);
+}
