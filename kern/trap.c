@@ -215,6 +215,7 @@ trap_dispatch(struct Trapframe *tf)
 		return;
 	case IRQ_OFFSET:
 		// clock interrupt
+		time_tick();
 		sched_yield();
 		break;
 	default:

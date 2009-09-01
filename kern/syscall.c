@@ -514,6 +514,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	case SYS_ipc_recv:
 		ret = sys_ipc_recv((void *)a1);
 		break;
+	case SYS_time_msec:
+		ret = sys_time_msec();
+		break;
 	default:
 		// NSYSCALLS
 		ret = -E_INVAL;
