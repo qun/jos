@@ -157,7 +157,7 @@ i386_vm_init(void)
 {
 	pde_t* pgdir;
 	uint32_t cr0;
-	size_t n;
+	size_t page_size, env_size;
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
@@ -186,12 +186,14 @@ i386_vm_init(void)
 	// programs will get read-only access to the array as well.
 	// You must allocate the array yourself.
 	// Your code goes here: 
-	n = ROUNDUP((sizeof(struct Page) * npage), PGSIZE);
-	pages = boot_alloc(n, PGSIZE);
+	page_size = ROUNDUP((sizeof(struct Page) * npage), PGSIZE);
+	pages = boot_alloc(page_size, PGSIZE);
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+	env_size = ROUNDUP((sizeof(struct Env) * NENV), PGSIZE);
+	envs = boot_alloc(env_size, PGSIZE);
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -214,7 +216,7 @@ i386_vm_init(void)
 	//    - the new image at UPAGES -- kernel R, user R
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
-	boot_map_segment(pgdir, UPAGES, n, PADDR(pages), PTE_U);
+	boot_map_segment(pgdir, UPAGES, page_size, PADDR(pages), PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map the 'envs' array read-only by the user at linear address UENVS
@@ -222,6 +224,7 @@ i386_vm_init(void)
 	// Permissions:
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
+	boot_map_segment(pgdir, UENVS, env_size, PADDR(envs), PTE_U);
 
 
 	//////////////////////////////////////////////////////////////////////
@@ -777,6 +780,32 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here. 
+	unsigned int va_start, va_end;
+	pte_t *pte;
+
+	perm |= PTE_P;
+	user_mem_check_addr = (uintptr_t)va;
+	// make 'va_start' and 'va_end' page-aligned.
+	va_start = ROUNDDOWN((unsigned int)va, PGSIZE);
+	va_end = ROUNDUP((unsigned int)(va + len), PGSIZE);
+
+	while (va_start < va_end) {
+		// check whether the address is below ULIM
+		if (va_start >= ULIM)
+			return -E_FAULT;
+
+		// check the page table permission
+		pte = pgdir_walk(env->env_pgdir, (void *)va_start, 0);
+		if (!pte)
+			return -E_FAULT;
+
+		if ((*pte & perm) != perm)
+			return -E_FAULT;
+
+		// update 'va_start' and 'user_mem_check_addr'
+		va_start += PGSIZE;
+		user_mem_check_addr = va_start;
+	}
 
 	return 0;
 }
