@@ -209,8 +209,7 @@ i386_vm_init(void)
 	//    - the new image at UPAGES -- kernel R, user R
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
-
-
+	boot_map_segment(pgdir, UPAGES, n, PADDR(pages), PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
         // Use the physical memory that bootstack refers to as
@@ -221,6 +220,7 @@ i386_vm_init(void)
 	//     * [KSTACKTOP-PTSIZE, KSTACKTOP-KSTKSIZE) -- not backed => faults
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
+	boot_map_segment(pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE. 
@@ -230,6 +230,7 @@ i386_vm_init(void)
 	// we just set up the amapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here: 
+	boot_map_segment(pgdir, KERNBASE, 0xffffffff-KERNBASE+1, 0, PTE_W);
 
 	// Check that the initial page directory has been set up correctly.
 	check_boot_pgdir();
@@ -651,9 +652,10 @@ boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, physaddr_t pa, int per
 	pte_t *pt;
 	int i;
 
+	perm &= 0xfff;
 	for (i = 0; i < size; i += PGSIZE) {
 		pt = pgdir_walk(pgdir, (void *)(la + i), 1);
-		*pt = PTE_ADDR(pa + i) | (perm & 0xFFF) | PTE_P;
+		*pt = PTE_ADDR(pa + i) | perm | PTE_P;
 	}
 }
 
