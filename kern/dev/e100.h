@@ -9,6 +9,11 @@
 // Device ID
 #define DEVICE_ID_82559ER	0x1209
 
+// Index of Base Address Register
+#define CSR_MM_BAR_INDEX	0x0
+#define CSR_IO_BAR_INDEX	0x1
+#define CSR_FLASH_BAR_INDEX	0x2
+
 // Declaration
 int e100_attach(struct pci_func *pcif);
 
