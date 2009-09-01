@@ -36,7 +36,7 @@ int e100_attach(struct pci_func *pcif)
 	// software reset (write to PORT in CSR)
 	outl(e100_pci.reg_base[CSR_IO_BAR_INDEX] + 0x8, 0x0);
 
-	// delay for 10us
+	// delay for 10us, see 6.3.3.1
 	delay_10us();
 
 	return 1;
