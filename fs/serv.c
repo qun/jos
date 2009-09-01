@@ -205,10 +205,14 @@ serve_map(envid_t envid, struct Fsreq_map *rq)
 	// Map read-only unless the file's open mode (o->o_mode) allows writes
 	// (see the O_ flags in inc/lib.h).
 	// LAB 5: Your code here.
-	if ((r = openfile_lookup(envid, rq->req_fileid, &o)) < 0)
+	if ((r = openfile_lookup(envid, rq->req_fileid, &o)) < 0) {
 		ipc_send(envid, r, 0, 0);
-	if ((r = file_get_block(o->o_file, rq->req_offset/BLKSIZE, &blk)) < 0)
+		return;
+	}
+	if ((r = file_get_block(o->o_file, rq->req_offset/BLKSIZE, &blk)) < 0) {
 		ipc_send(envid, r, 0, 0);
+		return;
+	}
 
 	perm = PTE_P | PTE_U | PTE_SHARE;
 	if ((o->o_mode & O_WRONLY) ||
@@ -267,10 +271,11 @@ serve_dirty(envid_t envid, struct Fsreq_dirty *rq)
 	// Send the return value back using ipc_send.
 	// LAB 5: Your code here.
 	if ((r = openfile_lookup(envid, rq->req_fileid, &o)) < 0)
-		ipc_send(envid, r, 0, 0);
+		goto out;
 	if ((r = file_dirty(o->o_file, rq->req_offset)) < 0)
-		ipc_send(envid, r, 0, 0);
+		goto out;
 
+out:
 	ipc_send(envid, 0, 0, 0);
 }
 
