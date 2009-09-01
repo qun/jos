@@ -75,7 +75,16 @@ read_block(uint32_t blockno, char **blk)
 		panic("reading free block %08x\n", blockno);
 
 	// LAB 5: Your code here.
-	panic("read_block not implemented");
+	if ((r = map_block(blockno)) < 0)
+		return r;
+
+	addr = diskaddr(blockno);
+	if ((r = ide_read(blockno * BLKSECTS, addr, BLKSECTS)) < 0)
+		return r;
+
+	if (blk)
+		*blk = addr;
+
 	return 0;
 }
 
@@ -86,6 +95,7 @@ read_block(uint32_t blockno, char **blk)
 void
 write_block(uint32_t blockno)
 {
+	int r;
 	char *addr;
 
 	if (!block_is_mapped(blockno))
@@ -93,7 +103,13 @@ write_block(uint32_t blockno)
 	
 	// Write the disk block and clear PTE_D.
 	// LAB 5: Your code here.
-	panic("write_block not implemented");
+	addr = diskaddr(blockno);
+
+	if ((r = ide_write(blockno * BLKSECTS, addr, BLKSECTS)) < 0)
+		panic("ide_write error: %e", r);
+
+	if ((r = sys_page_map(0, addr, 0, addr, PTE_USER)) < 0)
+		panic("sys_page_map error: %e", r);
 }
 
 // Make sure this block is unmapped.
@@ -142,7 +158,18 @@ int
 alloc_block_num(void)
 {
 	// LAB 5: Your code here.
-	panic("alloc_block_num not implemented");
+	if (super) {
+		int i;
+
+		for (i = 0; i < super->s_nblocks; i++) {
+			if (block_is_free(i)) {
+				bitmap[i/32] &= ~(1<<(i%32));
+				// write back free block bitmap
+				write_block(i/BLKBITSIZE+2);
+				return i;
+			}
+		}
+	}
 	return -E_NO_DISK;
 }
 
@@ -161,8 +188,15 @@ alloc_block(void)
 	// LAB 5: Your code here.
 	int r, bno;
 
-	panic("alloc_block not implemented");
-	return -E_NO_DISK;
+	if ((r = alloc_block_num()) < 0)
+		return r;
+
+	bno = r;
+	if ((r = map_block(bno)) < 0) {
+		free_block(bno);
+		return r;
+	}
+	return bno;
 }
 
 // Read and validate the file system super-block.
