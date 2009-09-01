@@ -320,8 +320,27 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 	// for easier bookkeeping.
 	// Hint: Use read_block for accessing the indirect block
 	// LAB 5: Your code here.
-	panic("file_block_walk not implemented");
-	
+	if (filebno < NDIRECT)
+		ptr = &f->f_direct[filebno];
+	else if (filebno < NINDIRECT) {
+		if (!f->f_indirect) {
+			if (!alloc)
+				return -E_NOT_FOUND;
+			if ((r = alloc_block()) < 0)
+				return r;
+			f->f_indirect = r;
+		} else
+			alloc = 0;	// we did not allocate a block
+		if ((r = read_block(f->f_indirect, &blk)) < 0)
+			return r;
+		assert(blk != 0);
+		if (alloc)
+			memset(blk, 0, BLKSIZE);
+		ptr = (uint32_t *)blk + filebno;
+	} else
+		return -E_INVAL;
+
+	*ppdiskbno = ptr;
 	return 0;
 }
 
@@ -337,14 +356,20 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 int
 file_map_block(struct File *f, uint32_t filebno, uint32_t *diskbno, bool alloc)
 {
-	
-
 	int r;
 	uint32_t *ptr;
 
-	// LAB 5: Your code here. 
-	panic("file_map_block not implemented");
-
+	// LAB 5: Your code here.
+	if ((r = file_block_walk(f, filebno, &ptr, alloc)) < 0)
+		return r;
+	if (!*ptr) {
+		if (!alloc)
+			return -E_NOT_FOUND;
+		if ((r = alloc_block()) < 0)
+			return r;
+		*ptr = r;
+	}
+	*diskbno = *ptr;
 	return 0;
 }
 
@@ -377,8 +402,10 @@ file_get_block(struct File *f, uint32_t filebno, char **blk)
 	// Read in the block, leaving the pointer in *blk.
 	// Hint: Use file_map_block and read_block.
 	// LAB 5: Your code here.
-	panic("file_get_block not implemented");
-	
+	if ((r = file_map_block(f, filebno, &diskbno, 1)) < 0)
+		return r;
+	if ((r = read_block(diskbno, blk)) < 0)
+		return r;
 	return 0;
 }
 
@@ -393,7 +420,9 @@ file_dirty(struct File *f, off_t offset)
 	// it with PTE_D set.
 	// Hint: Use file_get_block
 	// LAB 5: Your code here.
-	panic("file_dirty not implemented");
+	if ((r = file_get_block(f, offset/BLKSIZE, &blk)) < 0)
+		return r;
+	*(volatile char *)blk = *(volatile char *)blk;
 
 	return 0;
 }
