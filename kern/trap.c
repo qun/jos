@@ -163,7 +163,6 @@ trap_dispatch(struct Trapframe *tf)
 
 	switch (tf->tf_trapno) {
 	case T_BRKPT:
-		print_trapframe(tf);
 		panic("enter breakpoint");
 		break;
 	case T_PGFLT:
@@ -240,6 +239,8 @@ page_fault_handler(struct Trapframe *tf)
 	if ((tf->tf_cs & 3) == 0) {
 		// trapped from kernel mode
 		// and we are in trouble...
+		cprintf("kernel fault va %08x ip %08x\n",
+				fault_va, tf->tf_eip);
 		panic("page fault happend in kernel mode");
 		return;
 	}
@@ -271,13 +272,54 @@ page_fault_handler(struct Trapframe *tf)
 	//   user_mem_assert() and env_run() are useful here.
 	//   To change what the user environment runs, modify 'curenv->env_tf'
 	//   (the 'tf' variable points at 'curenv->env_tf').
-	
 	// LAB 4: Your code here.
+	unsigned int orig_esp;
+	struct UTrapframe utf;
 
-	// Destroy the environment that caused the fault.
-	cprintf("[%08x] user fault va %08x ip %08x\n",
-		curenv->env_id, fault_va, tf->tf_eip);
-	print_trapframe(tf);
-	env_destroy(curenv);
+	// Destroy the environment that caused the fault,
+	// if 'env_pgfault_upcall' is null
+	if (!curenv->env_pgfault_upcall) {
+		cprintf("not page fault handler installed.\n");
+		cprintf("[%08x] user fault va %08x ip %08x\n",
+				curenv->env_id, fault_va, tf->tf_eip);
+		print_trapframe(tf);
+		env_destroy(curenv);
+		return;
+	}
+	// check whether the user exception stack is accessible
+	user_mem_assert(curenv, (void *)(UXSTACKTOP-4), 4,
+					PTE_P | PTE_W | PTE_U);
+	// added according to 'faultbadhandler' to check whether
+	// the page fault installed is accessible to the user
+	user_mem_assert(curenv, (void *)(curenv->env_pgfault_upcall), 4,
+					PTE_P | PTE_U);
+	// initialize the utf according to tf
+	utf.utf_fault_va = fault_va;
+	utf.utf_err = tf->tf_err;
+	utf.utf_regs = tf->tf_regs;
+	utf.utf_eip = tf->tf_eip;
+	utf.utf_eflags = tf->tf_eflags;
+	utf.utf_esp = tf->tf_esp;
+
+	// tf->tf_esp is already on the user exception stack
+	if (tf->tf_esp >= UXSTACKTOP-PGSIZE && tf->tf_esp < UXSTACKTOP)
+		// push an empty 32-bit word
+		tf->tf_esp -= 4;
+	else
+		tf->tf_esp = UXSTACKTOP;
+	// push user trap frame
+	tf->tf_esp -= sizeof(struct UTrapframe);
+	if (tf->tf_esp < UXSTACKTOP-PGSIZE) {
+		cprintf("user exception stack overflowed.\n");
+		cprintf("[%08x] user fault va %08x ip %08x\n",
+				curenv->env_id, fault_va, tf->tf_eip);
+		print_trapframe(tf);
+		env_destroy(curenv);
+		return;
+	}
+	*(struct UTrapframe *)(tf->tf_esp) = utf;
+
+	tf->tf_eip = (unsigned int)curenv->env_pgfault_upcall;
+	env_run(curenv);
 }
 
