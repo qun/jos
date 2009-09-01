@@ -499,6 +499,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	case SYS_env_set_status:
 		ret = sys_env_set_status((envid_t)a1, (int)a2);
 		break;
+	case SYS_env_set_trapframe:
+		ret = sys_env_set_trapframe((envid_t)a1, (struct Trapframe *)a2);
+		break;
 	case SYS_env_set_pgfault_upcall:
 		ret = sys_env_set_pgfault_upcall((envid_t)a1, (void *)a2);
 		break;
